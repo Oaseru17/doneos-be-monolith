@@ -4,7 +4,10 @@ export type ProjectConfiguration = {
   };
   SERVICE_NAME: string;
   LOG_LEVEL: string;
-  SHARED_SECRETS: string;
+  SHARED_SECRETS: string; 
+  JWT_SECRET: string;
+  MONGODB_URI: string;
+  MONGODB_DB_NAME: string;
 };
 
 export type QueryObj = {

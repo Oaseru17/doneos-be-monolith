@@ -1,0 +1,1295 @@
+openapi: 3.0.0
+info:
+  title: DoneOS Backend API Documentation
+  description: |
+    Backend API for DoneOS, a productivity and task management system.
+    Provides endpoints for user management, task tracking, value streams, and calendar integration.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@doneos.com
+
+servers:
+  - url: https://api.doneos.com/v1
+    description: Production server
+  - url: https://staging-api.doneos.com/v1
+    description: Staging server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token must be provided in the Authorization header
+        
+        Example:
+        ```
+        Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        ```
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+            - INTERNAL_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - VALIDATION_ERROR
+          example: "INTERNAL_ERROR"
+        message:
+          type: string
+          example: "An unexpected error occurred"
+      required:
+        - code
+        - message
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isEmailVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - isEmailVerified
+
+    UserPreferences:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        multitaskDuringMeetings:
+          type: boolean
+        defaultTaskDuration:
+          type: integer
+          description: Duration in minutes
+        schedulingWindowDays:
+          type: integer
+        workingHours:
+          type: object
+          properties:
+            start:
+              type: string
+              pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]$'
+            end:
+              type: string
+              pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]$'
+        timeZone:
+          type: string
+      required:
+        - userId
+
+    ValueZone:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        calendarIntegrationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - priority
+        - userId
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        valueZoneId:
+          type: string
+          format: uuid
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        deadline:
+          type: string
+          format: date-time
+        brainpower:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        timeFixed:
+          type: boolean
+        multitaskAllowed:
+          type: boolean
+        effortEstimateMinutes:
+          type: integer
+        priority:
+          type: string
+          enum: [AUTO, LOW, MEDIUM, HIGH]
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, MISSED]
+        tags:
+          type: array
+          items:
+            type: string
+        isRecurring:
+          type: boolean
+        recurrencePattern:
+          type: string
+        dependencyIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        parentTaskId:
+          type: string
+          format: uuid
+          description: Reference to the parent task if this is a subtask
+        order:
+          type: integer
+          description: Order within the parent task's subtasks
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - valueZoneId
+        - brainpower
+        - effortEstimateMinutes
+        - userId
+
+    Calendar:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        valueZoneId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [GOOGLE, OUTLOOK, ICLOUD]
+        expiration:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - valueZoneId
+        - provider
+        - expiration
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+              required:
+                - email
+                - password
+                - firstName
+                - lastName
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - User
+      summary: Get user profile by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access this profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/preferences:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - User
+      summary: Get user preferences by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access these preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - User
+      summary: Update user preferences by ID
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: User preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to update these preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/value-zones:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Value Zones
+      summary: List user's value zones
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Value zones retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ValueZone'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access these value zones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Value Zones
+      summary: Create a new value zone for user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum: [HIGH, MEDIUM, LOW]
+              required:
+                - name
+                - priority
+      responses:
+        '201':
+          description: Value zone created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueZone'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to create value zones for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/value-zones/{id}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Value Zones
+      summary: Get value zone by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Value zone retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueZone'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access this value zone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Value zone not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Value Zones
+      summary: Update value zone
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum: [HIGH, MEDIUM, LOW]
+      responses:
+        '200':
+          description: Value zone updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueZone'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to update this value zone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Value zone not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Value Zones
+      summary: Delete value zone
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Value zone deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to delete this value zone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Value zone not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/tasks:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Tasks
+      summary: List user's tasks
+      description: |
+        Get a list of tasks for a user. Tasks can be filtered by date range, program, and status.
+        If no date range is specified, all tasks will be returned.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: programId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter tasks by program ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, COMPLETED, MISSED]
+          description: Filter tasks by status
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter tasks scheduled after this date (inclusive). If not provided, no start date filter is applied.
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter tasks scheduled before this date (inclusive). If not provided, no end date filter is applied.
+        - name: scheduledStart
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter tasks by their scheduled start date. If not provided, no scheduled start filter is applied.
+        - name: scheduledEnd
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter tasks by their scheduled end date. If not provided, no scheduled end filter is applied.
+        - name: deadline
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Filter tasks by their deadline. If not provided, no deadline filter is applied.
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access these tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task for user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                programId:
+                  type: string
+                  format: uuid
+                scheduledStart:
+                  type: string
+                  format: date-time
+                scheduledEnd:
+                  type: string
+                  format: date-time
+                deadline:
+                  type: string
+                  format: date-time
+                brainpower:
+                  type: string
+                  enum: [HIGH, MEDIUM, LOW]
+                timeFixed:
+                  type: boolean
+                multitaskAllowed:
+                  type: boolean
+                effortEstimateMinutes:
+                  type: integer
+                priority:
+                  type: string
+                  enum: [AUTO, LOW, MEDIUM, HIGH]
+                tags:
+                  type: array
+                  items:
+                    type: string
+                isRecurring:
+                  type: boolean
+                recurrencePattern:
+                  type: string
+                dependencyIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                subtasks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Task'
+              required:
+                - title
+                - programId
+                - brainpower
+                - effortEstimateMinutes
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to create tasks for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/tasks/{id}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Tasks
+      summary: Get task by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Tasks
+      summary: Update task
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                scheduledStart:
+                  type: string
+                  format: date-time
+                scheduledEnd:
+                  type: string
+                  format: date-time
+                deadline:
+                  type: string
+                  format: date-time
+                brainpower:
+                  type: string
+                  enum: [HIGH, MEDIUM, LOW]
+                timeFixed:
+                  type: boolean
+                multitaskAllowed:
+                  type: boolean
+                effortEstimateMinutes:
+                  type: integer
+                priority:
+                  type: string
+                  enum: [AUTO, LOW, MEDIUM, HIGH]
+                status:
+                  type: string
+                  enum: [PENDING, COMPLETED, MISSED]
+                tags:
+                  type: array
+                  items:
+                    type: string
+                isRecurring:
+                  type: boolean
+                recurrencePattern:
+                  type: string
+                dependencyIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                subtasks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Task'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to update this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete task
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to delete this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/calendar:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Calendar
+      summary: List user's calendars
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Calendars retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Calendar'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access these calendars
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Calendar
+      summary: Connect a new calendar for user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                programId:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                  enum: [GOOGLE, OUTLOOK, ICLOUD]
+                accessToken:
+                  type: string
+                refreshToken:
+                  type: string
+                expiration:
+                  type: string
+                  format: date-time
+              required:
+                - programId
+                - provider
+                - accessToken
+                - refreshToken
+                - expiration
+      responses:
+        '201':
+          description: Calendar connected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calendar'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to connect calendars for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/calendar/{id}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Calendar
+      summary: Get calendar by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Calendar retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calendar'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to access this calendar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calendar not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Calendar
+      summary: Update calendar
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessToken:
+                  type: string
+                refreshToken:
+                  type: string
+                expiration:
+                  type: string
+                  format: date-time
+              required:
+                - accessToken
+                - refreshToken
+                - expiration
+      responses:
+        '200':
+          description: Calendar updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calendar'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to update this calendar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calendar not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Calendar
+      summary: Disconnect calendar
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Calendar disconnected successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - User does not have permission to disconnect this calendar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calendar not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    get:
+      tags:
+        - Authentication
+      summary: Verify user email
+      description: Verifies a user's email address using a verification token
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Email verification token sent to the user's email
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email verified successfully"
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/resend-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend verification email
+      description: Resends the email verification link to the user's email address
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verification email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Verification email sent successfully"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: User
+    description: User profile and preferences management
+  - name: Value Zones
+    description: Value zone management
+  - name: Tasks
+    description: Task management
+  - name: Calendar
+    description: Calendar integration management

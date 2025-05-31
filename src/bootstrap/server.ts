@@ -3,6 +3,10 @@ import LOG from "../library/logging";
 
 // routes
 import healthRoutes from "../routes/health";
+import authRoutes from "../domains/user/routes/auth";
+import { errorHandler } from "../infrastructure/middleware/errorHandler";
+import valueZoneRoutes from "../domains/valueZone/routes/valueZoneRoutes";
+import taskRoutes from "../domains/task/routes/taskRoutes";
 
 const createServer = () => {
   const app = express();
@@ -42,18 +46,13 @@ const createServer = () => {
   /** Routes */
 
   /** Health check */
-  app.use("/health", healthRoutes);
+  app.use("/v1/health", healthRoutes);
+  app.use("/v1/auth", authRoutes);
+  app.use("/v1/value-zones", valueZoneRoutes);
+  app.use("/v1/tasks", taskRoutes);
 
   /** Error handling */
-  app.use((req, res, next) => {
-    const error = new Error("Not found");
-
-    LOG.error(error);
-
-    res.status(404).json({
-      message: error.message
-    });
-  });
+  app.use(errorHandler);
 
   return app;
 };

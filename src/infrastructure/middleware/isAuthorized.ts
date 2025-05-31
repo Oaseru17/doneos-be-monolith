@@ -5,7 +5,7 @@ export const isAuthorized = (req: Request, res: Response, next: NextFunction) =>
   let requestHeader: string;
   let sharedSecrets: string;
 
-  requestHeader = String(req.headers["x-reliance-authorization"]);
+  requestHeader = String(req.headers["x-api-key"]);
 
   sharedSecrets = process.env.SHARED_SECRETS || "";
   const SECRETS = JSON.parse(sharedSecrets);
@@ -15,6 +15,6 @@ export const isAuthorized = (req: Request, res: Response, next: NextFunction) =>
     next();
   } else {
     LOG.warn("Unauthorized request received");
-    res.status(403).json({ error: "Missing or incorrect x-reliance-authorization header" });
+    res.status(403).json({ error: "Missing or incorrect x-api-key header" });
   }
 };
